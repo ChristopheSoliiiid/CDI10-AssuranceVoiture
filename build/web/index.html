@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport"    content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="">
+
+        <title>Assurance Voiture !</title>
+
+        <link rel="shortcut icon" href="assets/images/favicon.ico" type="image/x-icon">
+
+        <link rel="stylesheet" media="screen" href="http://fonts.googleapis.com/css?family=Open+Sans:300,400,700">
+        <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+        <link rel="stylesheet" href="assets/css/font-awesome.min.css">
+
+        <!-- Custom styles for our template -->
+        <link rel="stylesheet" href="assets/css/bootstrap-theme.css" media="screen" >
+        <link rel="stylesheet" href="assets/css/main.css">
+        <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+        <script src="assets/js/html5shiv.js"></script>
+        <script src="assets/js/respond.min.js"></script>
+        <![endif]-->
+
+        <!-- SCRIPT POUR LA PUB -->
+        <script>
+            var webSocketPub = new WebSocket("ws://localhost:8080/AssuranceVoiture/endpointPub");
+
+            webSocketPub.onmessage = function (event) {
+                $("#pub").html('<img src="assets/images/' + event.data + '" alt="Une pub!">');
+            };
+        </script>
+
+        <!-- SCRIPT POUR LE CHAT -->
+        <script>
+            var webSocketChat;
+
+            function seConnecter() {
+                if ($("#pseudo").val() == '') {
+                    alert("Erreur: Vous devez saisir votre nom.");
+                } else {
+                    $('#connexionChat').hide();
+                    $('#envoyerChat').show();
+
+                    $("#message").keydown(function (event) {
+                        if (event.keyCode == 13) {
+
+                            if ($("#message").val() == '') {
+                                alert("Erreur: Message vide.");
+                            } else {
+                                $("#go").click();
+                                $("#message").val('');
+                            }
+
+                        }
+                    });
+
+                    webSocketChat = new WebSocket("ws://localhost:8080/AssuranceVoiture/endpointChat");
+
+                    webSocketChat.onerror = function () {
+                        alert("Erreur !");
+                    };
+
+                    webSocketChat.onclose = function () {
+                        $("#fenetreChat").html("<span>Déconnexion ...</span>");
+                    };
+
+                    webSocketChat.onmessage = function (event) {
+                        $("#fenetreChat").append(event.data /*+ "<br>"*/);
+                    };
+                }
+
+            }
+            ;
+
+            function envoyer() {
+
+                //var message = "<span style='color:" + $("#color").val() + "'>";
+                var message = "<span>";
+                message += $("#pseudo").val() + " : ";
+                message += $("#message").val();
+                message += "</span>";
+
+                webSocketChat.send(message);
+
+                if ($("#message").val() == '') {
+                    alert("Erreur: Message vide.");
+                } else {
+                    $("#message").val('');
+                }
+            }
+            ;
+
+            function deconnexion() {
+                webSocketChat.close();
+
+                $('#connexionChat').show();
+                $('#envoyerChat').hide();
+            }
+            ;
+        </script>
+        <!--<script src="assets/js/scrollwheel.js"></script>-->
+
+        <!-- SCRIPT POUR LA SELECTION DE LA VOITURE -->
+        <script>
+            function modeles() {
+                var xhttp = new XMLHttpRequest();
+
+                xhttp.onreadystatechange = function () {
+
+                    if (this.readyState == 4 && this.status == 200) {
+                        var tab = this.responseText.split(", ");
+                        var last = tab.length - 1;
+
+                        tab[0] = tab[0].replace("[", "");
+                        tab[last] = tab[last].replace("]", "");
+
+                        // Vide le select pour insérer les nouvelles options après
+                        $("#modeleSelect").empty();
+
+                        // Création d'une option désactivé pour inciter à choisir un modele
+                        $("#modeleSelect").append(
+                                new Option("---- Choisir un modèle ----", "", true, true));
+                        $("#modeleSelect option:selected").attr("disabled", "disabled");
+
+                        // De même pour la version du véhicule
+                        $("#versionSelect").empty();
+
+                        $("#versionSelect").append(
+                                new Option("---- Choisir un modèle ----", "", true, true));
+                        $("#versionSelect option:selected").attr("disabled", "disabled");
+
+                        for (elt in tab) {
+                            $("#modeleSelect").append(
+                                    new Option(tab[elt], tab[elt]));
+                        }
+                    }
+                };
+                var marque = $("#marqueSelect").val();
+
+                xhttp.open("GET", "AjaxServeur?marque=" + marque, true);
+                xhttp.send();
+            }
+            ;
+
+            function versions() {
+                var xhttp = new XMLHttpRequest();
+
+                xhttp.onreadystatechange = function () {
+
+                    if (this.readyState == 4 && this.status == 200) {
+                        var tab = this.responseText.split(", ");
+                        var last = tab.length - 1;
+
+                        tab[0] = tab[0].replace("[", "");
+                        tab[last] = tab[last].replace("]", "");
+
+                        // Vide le select pour insérer les nouvelles options après
+                        $("#versionSelect").empty();
+
+                        // Création d'une option désactivé pour inciter à choisir une version
+                        $("#versionSelect").append(
+                                new Option("---- Choisir une version ----", "", true, true));
+                        $("#versionSelect option:selected").attr("disabled", "disabled");
+
+                        for (elt in tab) {
+                            $("#versionSelect").append(
+                                    new Option(tab[elt], tab[elt]));
+                        }
+                    }
+                };
+
+                var modele = $("#modeleSelect").val();
+
+                xhttp.open("GET", "AjaxServeur?modele=" + modele, true);
+                xhttp.send();
+
+            }
+            ;
+        </script>
+
+        <script>
+            function calculDevis() {
+                var marque = $("#marqueSelect").val();
+                var modele = $("#modeleSelect").val();
+                var version = $("#versionSelect").val();
+                var usage = $("#usageSelect").val();
+                var parking = $("#parkingSelect").val();
+                var km = $("#kmSelect").val();
+
+                if (marque === null || modele === null || version === null) {
+                    var message = "<b>Vous devez selectionner votre véhicule.";
+
+                    $("#divDevis").show();
+                    $("#estimationDevis").removeClass("alert-success").addClass("alert-danger");
+
+                    $("#estimationDevis").html(message + "</b>");
+                } else {
+                    var urlWS = "http://localhost:8080/AssuranceCalcul/webresources/assurcalcul/calcul?";
+                    urlWS += "marque=" + marque + "&modele=" + modele + "&version=" + version + "&usage=" + usage + "&parking=" + parking + "&km=" + km;
+
+                    $.ajax({
+                        type: "GET",
+                        url: urlWS,
+                        success: function (data) {
+                            $("#divDevis").show();
+                            $("#estimationDevis").removeClass("alert-danger").addClass("alert-success");
+
+                            $("#estimationDevis").html("<b>Estimation</b> du prix de l'assurance : <b>" + data + " €</b> / mois.");
+                        }
+                    });
+                }
+            }
+            ;
+        </script>
+
+        
+    </head>
+
+
+
+    <body data-spy="scroll" data-traget=".navbar" id="page-top" class="home">
+        
+
+        <!-- Fixed navbar -->
+        <header>
+            <div class="navbar navbar-inverse navbar-fixed-top headroom" >
+                <div class="container">
+                    <div class="navbar-header">
+                        <!-- Button for smallest screens -->
+                        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse"><span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span> </button>
+                        <a class="navbar-brand" href="index.html"><img src="assets/images/logo.png" alt="AssurVoiture"></a>
+                    </div>
+                    <div class="navbar-collapse collapse">
+                        <ul class="nav navbar-nav pull-right">
+                            <li class="active"><a href="#page-top">Accueil</a></li>
+                            <li><a href="#devis">Obtenir un devis</a></li>
+                            <li><a href="#apropos">A Propos</a>
+                            <li><a href="#contact">Contact</a></li>
+                            <li><a href="Controleur?cmd=signin" id="connexion" class="btn btn-info">Connexion</a></li>
+                            <!--<li><a href="Controleur?cmd=chat" target="_blank" id="chat" class="btn btn-warning">Live chat</a></li>-->
+                            <li><button id="openChat" class="btn btn-warning">Live chat</button></li>
+                        </ul>
+                    </div><!--/.nav-collapse -->
+                </div>
+            </div>
+        </header>
+
+        <!-- /.navbar -->
+
+        <!-- Header -->
+        <header id="head">
+            <div class="container">
+                <div class="row">
+                    <h1 class="lead">Assurance Voiture</h1>
+                    <p class="tagline">Imaginez un super slogan ici qui va vous faire utiliser notre application !</p>
+                </div>
+            </div>
+        </header>
+        <!-- /Header --> 
+
+        <!-- La pub -->
+        <div class="jumbotron padding5">
+            <div class="container">
+                <div class="row center-block" id="pub">
+
+                </div>
+            </div>
+        </div>
+        <!-- La pub -->
+
+        <!-- Obtenir un devis -->
+        <div class="container" id="devis">
+
+            <h2 class="thin text-center">Obtenir un devis</h2>
+            <p class="thin text-center text-warning"><i>Ceci est une estimation du coût, nous vous recommandons fortement de vous <a href="Controleur?cmd=signin">connecter</a>
+                    ou de vous <a href="Controleur?cmd=signup">créer un compte</a> pour obtenir un devis adapté à vos besoins.</i></p>
+            <hr>
+            <div class="row">
+                <form>
+                    <div class="col-md-4 col-md-offset-1 col-sm-4 col-sm-offset-1">
+                        <h4 class="text-center top-margin"><u>Selectionner votre véhicule :</u></h4>
+
+
+                        <div class="top-margin">
+                            <label class="text-left">Marque du véhicule</label>
+                            <select name="marque" class="form-control" id="marqueSelect" onchange="modeles()" required>
+                                <option value="" disabled selected>---- Choisir une marque ----</option>
+                                <option value="BMW">BMW</option>
+                                <option value="Citroen">Citroën</option>
+                                <option value="Ford">Ford</option>
+                                <option value="Porsche">Porsche</option>
+                                <option value="Tesla">Tesla</option>
+                            </select>
+                        </div>
+
+                        <div class="top-margin">
+                            <label>Modèle du véhicule</label>
+                            <select name="modele" class="form-control" id="modeleSelect" onchange="versions()" required>
+                                <option value="" disabled selected>---- Choisir une marque ----</option>
+                            </select>
+                        </div>
+
+                        <div class="top-margin">
+                            <label>Version du véhicule</label>
+                            <select name="version" class="form-control" id="versionSelect" required>
+                                <option value="" disabled selected>---- Choisir une marque ----</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4 col-sm-4 col-md-push-2 col-sm-push-2">
+                        <h4 class="text-center top-margin"><u>Utilisation du véhicule :</u></h4>
+
+
+                        <div class="top-margin">
+                            <label class="text-left">Usage prévu du véhicule</label>
+                            <select name="usage" class="form-control" id="usageSelect">
+                                <option value="prive">Privé</option>
+                                <option value="priveTrajetTravail">Privé et trajet travail</option>
+                                <option value="privePro">Privé et professionnel</option>
+                                <option value="tournees">Tournées régulières</option>
+                            </select>
+                        </div>
+
+                        <div class="top-margin">
+                            <label>Mode de parking la nuit</label>
+                            <select name="parking" class="form-control" id="parkingSelect">
+                                <option value="garageIndividuel">Garage fermé individuel</option>
+                                <option value="garageCollectif">Parking fermé collectif</option>
+                                <option value="parkingPleinAir">Parking collectif en plein air</option>
+                                <option value="jardinPrive">Jardin clos privé</option>
+                                <option value="voiePublique">Voie publique</option>
+                            </select>
+                        </div>
+
+                        <div class="top-margin">
+                            <label>Kilomètres parcourus par an (maximum)</label>
+                            <select name="km" class="form-control" id="kmSelect">
+                                <option value="moins2000">Moins de 2000</option>
+                                <option value="2000">2000</option>
+                                <option value="5000">5000</option>
+                                <option value="7000">7000</option>
+                                <option value="10000">10 000</option>
+                                <option value="12500">12 500</option>
+                                <option value="15000">15 000</option>
+                                <option value="20000">20 000</option>
+                                <option value="25000">25 000</option>
+                                <option value="30000">30 000</option>
+                                <option value="40000">40 000</option>
+                                <option value="plus40000">Plus de 40 000</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-12 top-margin text-center">
+                        <br>
+                        <button class="btn btn-info" type="button" onclick="calculDevis()">Obtenir un devis</button>
+                    </div>
+
+
+                    <div class="col-md-12 top-margin text-center" id="divDevis">
+                        <br> <br>
+                        <span id="estimationDevis" class="alert alert-success">
+
+                        </span>
+                    </div>
+                </form>
+
+            </div>
+
+
+
+        </div>
+        <!-- /Obtenir un devis-->
+
+
+
+
+        <!-- A propos -->
+        <div class="jumbotron top-space" id="apropos">
+            <div class="container">
+
+                <div class="row">
+
+                    <article class="col-xs-12 maincontent">
+                        <header class="page-header">
+                            <h2 class="page-title text-center">A propos</h2>
+                        </header>
+
+                        <div class="col-xs-12 text-justify text-muted">                            
+                            <p>
+                                Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                            </p>
+                            <p>
+                                Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida. Duis ac tellus et risus vulputate vehicula. Donec lobortis risus a elit. Etiam tempor. Ut ullamcorper, ligula eu tempor congue, eros est euismod turpis, id tincidunt sapien risus a quam. Maecenas fermentum consequat mi. Donec fermentum. Pellentesque malesuada nulla a mi. Duis sapien sem, aliquet nec, commodo eget, consequat quis, neque. Aliquam faucibus, elit ut dictum aliquet, felis nisl adipiscing sapien, sed malesuada diam lacus eget erat. Cras mollis scelerisque nunc. Nullam arcu. Aliquam consequat. Curabitur augue lorem, dapibus quis, laoreet et, pretium ac, nisi. Aenean magna nisl, mollis quis, molestie eu, feugiat in, orci. In hac habitasse platea dictumst.
+                            </p>
+                        </div>
+
+                    </article>
+
+                </div>
+
+            </div>
+        </div>
+        <!-- /A propos -->
+
+        <!-- Contact -->
+        <div id="contact">
+            <div class="container">
+
+                <div class="row">
+                    <article class="col-xs-12 maincontent">
+                        <header class="page-header">
+                            <h2 class="page-title text-center">Contact</h2>
+                        </header>
+
+                        <form>
+                            <div class="col-md-5 col-md-offset-1 col-sm-5 col-sm-offset-1">
+
+                                <div class="top-margin">
+                                    <label class="control-label">Votre e-mail : <span class="text-danger">*</span></label>
+                                    <input type="email" class="form-control" name="email_confirmation" data-validation="email">
+                                </div>
+                                <div class="top-margin">
+                                    <label class="control-label">Votre nom : <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" data-validation="required">
+                                </div>
+                                <div class="top-margin">
+                                    <label class="control-label">Votre numéro de téléphone :</label>
+                                    <input type="number" class="form-control">
+                                </div>
+                            </div>
+
+                            <div class="col-md-5 col-sm-5">
+                                <div class="top-margin">
+                                    <label class="control-label">Votre message : <span class="text-danger">*</span></label>
+                                    <textarea class="form-control" rows="9" data-validation="length" data-validation-length="20-500"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="col-md-12 top-margin text-center">
+                                <button class="btn btn-info" type="submit">Envoyer</button>
+                            </div>
+                        </form>
+
+                    </article>
+                </div>
+
+            </div>
+        </div>
+        <!-- /Contact -->
+
+
+
+        <!-- Test pour le chat -->
+        <div id="chatContainer">
+            <!--<button id="closeChat">X</button>-->
+
+            <div id="fenetreChat" class="scrollable">
+
+            </div>
+
+            <p id="connexionChat">
+                <!--<input type="color" id="color">-->
+                <input type="text" placeholder="Votre nom" id="pseudo">                    
+                <button onclick="seConnecter()">Se connecter</button>
+                <button class="quitter">Quitter</button>
+            </p>
+
+            <p id="envoyerChat">
+                <input type="text" placeholder="Votre message" id="message">
+                <button onclick="envoyer()" id="go" class="btn btn-success">Envoyer</button>
+                <!--<button onclick="deconnexion()" id="deco" class="btn btn-danger">Se deconnecter</button>-->
+                <button onclick="deconnexion();" id="deco" class="quitter">Déconnexion</button>
+            </p>
+        </div>
+        <!-- /Test pour le chat -->
+
+
+
+        <br>
+        <div class="footer2 top-margin">
+            <div class="container">
+                <div class="row">
+
+                    <div class="col-md-6 widget">
+                        <div class="widget-body">
+                            <p class="simplenav">
+                                <a href="#page-top">Accueil</a> | 
+                                <a href="#devis">Obtenir un devis</a> |
+                                <a href="#apropos">A Propos</a> |
+                                <a href="#contact">Contact</a> |
+                                <a href="Controleur?cmd=signin">Connexion</a> |
+                                <a href="Controleur?cmd=chat">Live chat</a>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 widget">
+                        <div class="widget-body">
+                            <p class="text-right">
+                                Copyright &copy; 2016, Assurance Voiture. 
+                            </p>
+                        </div>
+                    </div>
+
+                </div> <!-- /row of widgets -->
+            </div>
+        </div>
+
+        <!-- JavaScript libs are placed at the end of the document so the pages load faster -->
+        <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+        <script src="assets/js/headroom.min.js"></script>
+        <script src="assets/js/jQuery.headroom.min.js"></script>
+        <script src="assets/js/template.js"></script>
+        <script>
+                    // Scrollspy fluide
+                    $(function () {
+                        $('header a').on('click', function (e) {
+                            e.preventDefault();
+                            var hash = this.hash;
+                            $('html, body').animate({
+                                scrollTop: $(this.hash).offset().top
+                            }, 700, function () {
+                                window.location.hash = hash;
+                            });
+                        });
+
+                        // Permet de pouvoir cliquer pour rediriger vers une autre page
+                        // Empeche le script au dessus de s'executer sur les boutons
+                        $('#connexion').unbind('click');
+                        $('#chat').unbind('click');
+                    });
+        </script>
+
+        <script>
+            $('#openChat').on('click', function () {
+                $('#chatContainer').show();
+                $('#envoyer').hide();
+            });
+
+            $('.quitter').on('click', function () {
+                $('#chatContainer').hide();
+            });
+        </script>
+    </body>
+</html>
